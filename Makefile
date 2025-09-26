@@ -1,4 +1,4 @@
-.PHONY: watch watch-once smoke smoke-done smoke-once status status-watch events events-follow seed-labels
+.PHONY: watch watch-once smoke smoke-done smoke-once smoke-once-nodone status status-watch events events-follow seed-labels
 
 # Expect GH_REPO and AGENT_ROLE to be exported in the environment
 # Example:
@@ -22,6 +22,9 @@ smoke-done:
 
 smoke-once:
 	@WATCH_INTERVAL=$(WATCH_INTERVAL) scripts/smoke/once.sh --mark-done
+
+smoke-once-nodone:
+	@WATCH_INTERVAL=$(WATCH_INTERVAL) scripts/smoke/once.sh --no-mark-done
 
 status:
 	@scripts/telemetry/status-board.sh --summary
