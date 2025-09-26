@@ -1,4 +1,4 @@
-.PHONY: watch watch-once smoke smoke-done smoke-once status events seed-labels
+.PHONY: watch watch-once smoke smoke-done smoke-once status status-watch events events-follow seed-labels
 
 # Expect GH_REPO and AGENT_ROLE to be exported in the environment
 # Example:
@@ -29,6 +29,11 @@ status:
 events:
 	@scripts/telemetry/status-board.sh --events $(EVENT_LINES)
 
+status-watch:
+	@scripts/telemetry/status-board.sh --watch 10
+
+events-follow:
+	@scripts/telemetry/status-board.sh --events-follow
+
 seed-labels:
 	@DRY_RUN=0 scripts/admin/seed-labels.sh
-
