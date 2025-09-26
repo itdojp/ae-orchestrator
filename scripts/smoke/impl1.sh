@@ -19,7 +19,9 @@ while (($#)); do
   case "$1" in
     --mark-done) MARK_DONE=1; shift;;
     --issue) TARGET_ISSUE="${2:?issue-number required}"; shift 2;;
-    --help|-h) echo "Usage: $0 [--mark-done]"; exit 0;;
+    --timeout) TIMEOUT="${2:?seconds required}"; shift 2;;
+    --sleep) SLEEP="${2:?seconds required}"; shift 2;;
+    --help|-h) echo "Usage: $0 [--mark-done] [--issue <num>] [--timeout <sec>] [--sleep <sec>]"; exit 0;;
     *) echo "Unknown option: $1" >&2; exit 1;;
   esac
 done
