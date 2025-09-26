@@ -1,0 +1,1 @@
+{"agent":"role:IMPL-MED-1","role":"role:IMPL-MED-1","repo":"itdojp/ae-orchestrator","state":"running","last_cycle_at":"2025-09-26T19:20:20Z","queue_snapshot":[12],"last_action":{"at":"2025-09-26T19:20:21Z","action":"/start","result":"ok","issue":12}}
