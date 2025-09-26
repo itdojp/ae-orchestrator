@@ -5,6 +5,7 @@ set -euo pipefail
 : "${AGENT_ROLE:?AGENT_ROLE is required (e.g. role:IMPL-MED-1)}"
 WATCH_INTERVAL="${WATCH_INTERVAL:-60}"
 DISPATCH_COOLDOWN_SECONDS="${DISPATCH_COOLDOWN_SECONDS:-600}"
+WATCH_MAX_PER_CYCLE="${WATCH_MAX_PER_CYCLE:-0}"
 
 # Options
 RUN_ONCE=0
@@ -49,6 +50,10 @@ write_status running "$(now)" '[]' "" startup ready "$(now)"
 while true; do
   cycle_ts="$(now)"
   mapfile -t issues < <(gh issue list --repo "$GH_REPO" --label "$AGENT_ROLE" --label status:ready --json number,title | jq -r '.[].number')
+  if (( WATCH_MAX_PER_CYCLE > 0 && ${#issues[@]} > WATCH_MAX_PER_CYCLE )); then
+    log "Limiting to first $WATCH_MAX_PER_CYCLE issue(s) this cycle (of ${#issues[@]})"; emit queue-limit "max=$WATCH_MAX_PER_CYCLE total=${#issues[@]}";
+    issues=("${issues[@]:0:WATCH_MAX_PER_CYCLE}")
+  fi
   issue_snapshot="$(printf '%s\n' "${issues[@]:-}" | jq -R -s 'split("\n") | map(select(length>0) | tonumber)')"
 
   if ((${#issues[@]} == 0)); then

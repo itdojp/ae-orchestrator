@@ -32,6 +32,8 @@ export CODEX_AUTOPILOT=1
 
 環境変数（任意のチューニング）
 - `DISPATCH_COOLDOWN_SECONDS` (default: `600`) — ウォッチャーが直近で `/start` コメント済みの場合、同一 Issue への再ディスパッチをスキップするクールダウン秒数。
+- `WATCH_DRY_RUN` (default: `0`) — `1` にするとディスパッチをシミュレーション（`/start` コメントやラベル変更は行わず、ステータスに `dry-run` を記録）。CI 等で安全に動作確認したい場合に便利。
+- `WATCH_MAX_PER_CYCLE` (default: `0`=no limit) — 1サイクルで処理する Issue 数の上限。大きめのREADYキューを段階的に消化したい場合に利用。
 
 3) 実行
 ```bash
