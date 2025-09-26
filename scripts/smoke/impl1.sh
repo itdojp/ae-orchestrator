@@ -12,6 +12,16 @@ set -euo pipefail
 : "${GH_REPO:?GH_REPO is required (e.g. owner/repo)}"
 : "${AGENT_ROLE:?AGENT_ROLE is required (e.g. role:IMPL-MED-1)}"
 
+# Options
+MARK_DONE=0
+while (($#)); do
+  case "$1" in
+    --mark-done) MARK_DONE=1; shift;;
+    --help|-h) echo "Usage: $0 [--mark-done]"; exit 0;;
+    *) echo "Unknown option: $1" >&2; exit 1;;
+  esac
+done
+
 for c in gh jq; do command -v "$c" >/dev/null 2>&1 || { echo "Required command not found: $c" >&2; exit 2; }; done
 
 TITLE="SMOKE: IMPL-1 watcher/runner pipeline"
@@ -62,6 +72,11 @@ while true; do
 
   if (( found_running==1 && found_start_comment==1 )); then
     echo "[smoke] SUCCESS: watcher/runner pipeline responded"
+    if (( MARK_DONE == 1 )); then
+      gh issue edit "$issue" --repo "$GH_REPO" --remove-label status:ready >/dev/null 2>&1 || true
+      gh issue edit "$issue" --repo "$GH_REPO" --add-label status:done >/dev/null 2>&1 || true
+      echo "[smoke] Marked issue #$issue as status:done"
+    fi
     exit 0
   fi
   sleep "$SLEEP"
