@@ -57,7 +57,7 @@ while true; do
 
   log "Found ${#issues[@]} ready issue(s): ${issues[*]}"; emit queue "count=${#issues[@]} issues=${issues[*]}"
   for issue in "${issues[@]}"; do
-    act_ts="$(now)"; log "Dispatching /start to #$issue"
+    act_ts="$(now)"; log "Evaluating /start dispatch to #$issue"
     # Cooldown: skip if a recent '/start' exists within the cooldown window
     last_start_ts=$(gh issue view "$issue" --repo "$GH_REPO" --json comments 2>/dev/null | jq -r '.comments | map(select(.body=="/start") | .createdAt) | sort | last // empty') || last_start_ts=""
     if [[ -n "$last_start_ts" && "$last_start_ts" != "null" ]]; then
@@ -68,6 +68,7 @@ while true; do
         write_status running "$cycle_ts" "$issue_snapshot" "$issue" "/start" skipped:cooldown "$act_ts"; continue
       fi
     fi
+    log "Dispatching /start to #$issue"
     if gh issue comment "$issue" --repo "$GH_REPO" --body "/start"; then
       emit dispatch "issue=$issue action=/start"; log "Dispatched /start to #$issue successfully"
       # Prevent repeated dispatching: move issue out of READY queue
