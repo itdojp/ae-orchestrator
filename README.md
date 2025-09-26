@@ -68,6 +68,18 @@ scripts/smoke/impl1.sh
 - Issue に `/start` コメントが付与される
 - ラベルが `status:ready` から `status:running` に切り替わり、再ディスパッチが止まる（冪等化）
 
+オプション:
+- `--mark-done` 成功後に `status:done` を付与し、`status:ready/status:running` を外す（キューをクリーンに保つ）
+- `--issue <number>` 既存の Issue を対象にしてスモークを行う（新規作成しない）
+
+CI/ワンショット向け:
+```bash
+# 1サイクルのみのディスパッチ→検証
+export GH_REPO="<owner>/<repo>"; export AGENT_ROLE="role:IMPL-MED-1"
+scripts/smoke/once.sh --mark-done
+```
+内部で以下を実行します: ラベル初期化 → スモーク Issue 準備 → `watch.sh --once` → 検証（成功時は `--mark-done` でクリーンアップ）
+
 ## 開発
 - 進捗・計画: Roadmap (#10), MVP (#1), タスク #2–#9 を参照
 - ライセンス: Apache-2.0
@@ -81,6 +93,8 @@ scripts/smoke/impl1.sh
 │  ├─ telemetry/status-board.sh
 │  └─ backlog/sync.sh
 │  └─ admin/seed-labels.sh
+│  └─ smoke/impl1.sh
+│  └─ smoke/once.sh
 └─ .github/workflows/lint.yml
 
 ### Repo ラベルの初期化
