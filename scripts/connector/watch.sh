@@ -4,6 +4,7 @@ set -euo pipefail
 : "${GH_REPO:?GH_REPO is required (e.g. owner/repo)}"
 : "${AGENT_ROLE:?AGENT_ROLE is required (e.g. role:IMPL-MED-1)}"
 WATCH_INTERVAL="${WATCH_INTERVAL:-60}"
+DISPATCH_COOLDOWN_SECONDS="${DISPATCH_COOLDOWN_SECONDS:-600}"
 
 root_dir="$(cd "$(dirname "$0")/../.." && pwd)"
 log_dir="$root_dir/telemetry/logs"
@@ -47,6 +48,15 @@ while true; do
   log "Found ${#issues[@]} ready issue(s): ${issues[*]}"; emit queue "count=${#issues[@]} issues=${issues[*]}"
   for issue in "${issues[@]}"; do
     act_ts="$(now)"; log "Dispatching /start to #$issue"
+    # Cooldown: skip if a recent '/start' exists within the cooldown window
+    last_start_ts=$(gh issue view "$issue" --repo "$GH_REPO" --json comments 2>/dev/null | jq -r '.comments | map(select(.body=="/start") | .createdAt) | sort | last // empty') || last_start_ts=""
+    if [[ -n "$last_start_ts" && "$last_start_ts" != "null" ]]; then
+      last_epoch=$(date -u -d "$last_start_ts" +%s 2>/dev/null || date -u +%s)
+      now_epoch=$(date -u +%s)
+      if (( now_epoch - last_epoch < DISPATCH_COOLDOWN_SECONDS )); then
+        log "Skipping dispatch to #$issue due to cooldown (last /start at $last_start_ts)"; emit skip "issue=$issue reason=cooldown last_start=$last_start_ts"; continue
+      fi
+    fi
     if gh issue comment "$issue" --repo "$GH_REPO" --body "/start"; then
       emit dispatch "issue=$issue action=/start"; log "Dispatched /start to #$issue successfully"
       # Prevent repeated dispatching: move issue out of READY queue

@@ -30,6 +30,9 @@ export ZELLIJ_SESSION=codex-impl-1         # セッション名
 export CODEX_AUTOPILOT=1
 ```
 
+環境変数（任意のチューニング）
+- `DISPATCH_COOLDOWN_SECONDS` (default: `600`) — ウォッチャーが直近で `/start` コメント済みの場合、同一 Issue への再ディスパッチをスキップするクールダウン秒数。
+
 3) 実行
 ```bash
 scripts/connector/watch.sh
