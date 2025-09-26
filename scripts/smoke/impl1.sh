@@ -55,9 +55,10 @@ else
   fi
 fi
 
-# Ensure labels: role + status:ready (remove status:running to re-queue if present)
+# Ensure labels: role + status:ready (remove status:running/status:done to re-queue if present)
 gh issue edit "$issue" --repo "$GH_REPO" --add-label "$AGENT_ROLE" >/dev/null || true
 gh issue edit "$issue" --repo "$GH_REPO" --remove-label status:running >/dev/null 2>&1 || true
+gh issue edit "$issue" --repo "$GH_REPO" --remove-label status:done >/dev/null 2>&1 || true
 gh issue edit "$issue" --repo "$GH_REPO" --add-label status:ready >/dev/null || true
 echo "[smoke] Labeled #$issue with: $AGENT_ROLE, status:ready"
 
