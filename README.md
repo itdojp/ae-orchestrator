@@ -77,5 +77,14 @@ scripts/smoke/impl1.sh
 │  ├─ autopilot.sh
 │  ├─ telemetry/status-board.sh
 │  └─ backlog/sync.sh
+│  └─ admin/seed-labels.sh
 └─ .github/workflows/lint.yml
+
+### Repo ラベルの初期化
+以下で共通ラベル（例: `status:running`, `status:review`, `autopilot:*`）を作成できます。
+
+```bash
+export GH_REPO="<owner>/<repo>"
+scripts/admin/seed-labels.sh       # DRY_RUN=1 でドライラン
+```
 ```
