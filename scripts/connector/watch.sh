@@ -6,6 +6,16 @@ set -euo pipefail
 WATCH_INTERVAL="${WATCH_INTERVAL:-60}"
 DISPATCH_COOLDOWN_SECONDS="${DISPATCH_COOLDOWN_SECONDS:-600}"
 
+# Options
+RUN_ONCE=0
+while (($#)); do
+  case "$1" in
+    --once) RUN_ONCE=1; shift;;
+    --help|-h) echo "Usage: $0 [--once]"; exit 0;;
+    *) echo "Unknown option: $1" >&2; exit 1;;
+  esac
+done
+
 root_dir="$(cd "$(dirname "$0")/../.." && pwd)"
 log_dir="$root_dir/telemetry/logs"
 status_dir="$root_dir/telemetry/status"
@@ -85,5 +95,7 @@ while true; do
       rc=$?; emit error "issue=$issue action=/start exit=$rc"; log "Failed to dispatch /start to #$issue (exit=$rc)"; write_status running "$cycle_ts" "$issue_snapshot" "$issue" "/start" "error:$rc" "$act_ts"
     fi
   done
+  # Stop after a single cycle if requested
+  if (( RUN_ONCE == 1 )); then log "Run-once mode: exiting after one cycle"; emit shutdown "mode=once"; write_status stopped "$(now)" "$issue_snapshot" "" stopped once "$(now)"; break; fi
   sleep "$WATCH_INTERVAL"
 done

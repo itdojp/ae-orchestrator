@@ -45,6 +45,9 @@ scripts/telemetry/status-board.sh --watch 10   # 概要
 scripts/telemetry/status-board.sh --events 50  # 直近イベント
 ```
 
+コマンドラインオプション
+- `--once` — 1サイクルのみ実行して終了（CI やワンショット検証向け）
+
 ## Smoke Test (IMPL-1)
 
 ウォッチャー/ランナーのスモークテストを実行するには、環境変数を設定した上で以下を実行します。
