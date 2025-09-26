@@ -91,10 +91,12 @@ while true; do
       gh issue edit "$issue" --repo "$GH_REPO" --add-label status:done >/dev/null 2>&1 || true
       echo "[smoke] Marked issue #$issue as status:done (removed status:ready/status:running)"
     fi
+    echo "[smoke] Issue URL: https://github.com/${GH_REPO}/issues/${issue}"
     exit 0
   fi
   sleep "$SLEEP"
 done
 
 echo "[smoke] FAILED: conditions not met (running=${found_running}, start=${found_start_comment})"
+echo "[smoke] Issue URL: https://github.com/${GH_REPO}/issues/${issue}"
 exit 1
