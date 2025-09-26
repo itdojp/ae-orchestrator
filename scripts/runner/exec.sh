@@ -19,7 +19,9 @@ ${body}
 ---
 
 Instructions (Marathon):
-- Implement → test → commit → update Draft PR → post progress to the Issue; keep scope tight.
+- Pick next minimal step; implement → test → commit → update Draft PR → post progress to the Issue.
+- Keep scope tight; avoid unrelated changes; keep diffs ≤ 300 LOC per PR.
+- If blocked, record cause and unblock conditions; otherwise continue.
 - Stop when labeled status:review/done/blocked.
 PROMPT
 )
