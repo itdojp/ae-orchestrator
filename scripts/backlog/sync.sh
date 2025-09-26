@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+: "${GH_REPO:?owner/repo}"; FILE="${1:-backlog.json}"; [ -f "$FILE" ] || { echo "Backlog file not found: $FILE" >&2; exit 2; }
+for c in jq gh; do command -v "$c" >/dev/null 2>&1 || { echo "Required: $c" >&2; exit 2; }; done
+epic=$(jq -r '.epic // empty' "$FILE"); sprint=$(jq -r '.sprint // empty' "$FILE")
+create(){ local id="$1" title="$2" body="$3" role="$4" ready="$5"; shift 5 || true; local labels=("$role"); [[ -n "$sprint" ]] && labels+=("$sprint"); while (("$#")); do labels+=("$1"); shift; done; [[ -n "$epic" ]] && labels+=("epic:${epic}"); if gh issue list --repo "$GH_REPO" --state all --search "\"Backlog-ID: ${id}\" in:body" --limit 1 --json number 2>/dev/null | jq -e 'length>0' >/dev/null; then echo "exists: $id"; return 0; fi; local args=(); for l in "${labels[@]}"; do args+=(--label "$l"); done; local url; url=$(gh issue create --repo "$GH_REPO" --title "$title" --body "$body\n\nBacklog-ID: ${id}" "${args[@]}"); echo "create: $id — $url"; [[ "$ready" == "true" ]] && gh issue edit "${url##*/}" --repo "$GH_REPO" --add-label status:ready >/dev/null || true; }
+jq -c '.tasks[] | {id,title,body,role,labels,ready}' "$FILE" | while read -r row; do id=$(jq -r '.id' <<<"$row"); title=$(jq -r '.title' <<<"$row"); body=$(jq -r '.body' <<<"$row"); role=$(jq -r '.role' <<<"$row"); ready=$(jq -r '.ready' <<<"$row"); mapfile -t extra < <(jq -r '.labels[]?' <<<"$row"); create "$id" "$title" "$body" "$role" "$ready" "${extra[@]:-}"; done
