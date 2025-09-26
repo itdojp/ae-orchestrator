@@ -54,7 +54,8 @@ while true; do
       last_epoch=$(date -u -d "$last_start_ts" +%s 2>/dev/null || date -u +%s)
       now_epoch=$(date -u +%s)
       if (( now_epoch - last_epoch < DISPATCH_COOLDOWN_SECONDS )); then
-        log "Skipping dispatch to #$issue due to cooldown (last /start at $last_start_ts)"; emit skip "issue=$issue reason=cooldown last_start=$last_start_ts"; continue
+        log "Skipping dispatch to #$issue due to cooldown (last /start at $last_start_ts)"; emit skip "issue=$issue reason=cooldown last_start=$last_start_ts";
+        write_status running "$cycle_ts" "$issue_snapshot" "$issue" "/start" skipped:cooldown "$act_ts"; continue
       fi
     fi
     if gh issue comment "$issue" --repo "$GH_REPO" --body "/start"; then
