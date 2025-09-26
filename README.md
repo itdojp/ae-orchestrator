@@ -160,5 +160,9 @@ scripts/smoke/once.sh --mark-done
 ├─ docs/systemd/ae-telemetry-archive.timer
 ├─ .github/workflows/exec-healthcheck.yml
 ├─ .github/workflows/smoke.yml
+│  └─ backlog/sync.sh
+│  └─ admin/seed-labels.sh
+│  └─ smoke/impl1.sh
+│  └─ smoke/once.sh
 └─ .github/workflows/lint.yml
 ```
