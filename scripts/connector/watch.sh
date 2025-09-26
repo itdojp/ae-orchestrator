@@ -49,6 +49,12 @@ while true; do
     act_ts="$(now)"; log "Dispatching /start to #$issue"
     if gh issue comment "$issue" --repo "$GH_REPO" --body "/start"; then
       emit dispatch "issue=$issue action=/start"; log "Dispatched /start to #$issue successfully"
+      # Prevent repeated dispatching: move issue out of READY queue
+      if gh issue edit "$issue" --repo "$GH_REPO" --remove-label status:ready --add-label status:running >/dev/null 2>&1; then
+        emit state "issue=$issue label:status:ready->status:running"; log "Transitioned labels for #$issue: status:ready -> status:running"
+      else
+        emit warn "issue=$issue label-transition failed"; log "Warning: failed to transition labels for #$issue (ready->running)"
+      fi
       if [[ "${CODEX_BRIDGE:-}" == "zellij" && -n "${ZELLIJ_SESSION:-}" ]]; then scripts/runner/bridge-zellij.sh "$issue" || true; fi
       if [[ "${CODEX_EXEC:-}" == "1" && -n "${AGENT_WORKDIR:-}" ]]; then scripts/runner/exec.sh "$issue" || true; fi
       if [[ "${CODEX_AUTOPILOT:-}" == "1" && -n "${ZELLIJ_SESSION:-}" ]]; then scripts/autopilot.sh "$issue" >/dev/null 2>&1 & disown || true; fi

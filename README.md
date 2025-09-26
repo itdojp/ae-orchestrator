@@ -42,6 +42,26 @@ scripts/telemetry/status-board.sh --watch 10   # 概要
 scripts/telemetry/status-board.sh --events 50  # 直近イベント
 ```
 
+## Smoke Test (IMPL-1)
+
+ウォッチャー/ランナーのスモークテストを実行するには、環境変数を設定した上で以下を実行します。
+
+```bash
+export GH_REPO="<owner>/<repo>"
+export AGENT_ROLE="role:IMPL-MED-1"
+
+# 別ターミナルでウォッチャーを起動しておく
+scripts/connector/watch.sh &
+
+# スモークテスト: 試験用 Issue を作成/再利用し、
+# status:ready → watcher が /start コメントと共に status:running へ遷移することを検証
+scripts/smoke/impl1.sh
+```
+
+期待結果:
+- Issue に `/start` コメントが付与される
+- ラベルが `status:ready` から `status:running` に切り替わり、再ディスパッチが止まる（冪等化）
+
 ## 開発
 - 進捗・計画: Roadmap (#10), MVP (#1), タスク #2–#9 を参照
 - ライセンス: Apache-2.0
