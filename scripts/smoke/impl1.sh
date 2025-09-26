@@ -74,8 +74,9 @@ while true; do
     echo "[smoke] SUCCESS: watcher/runner pipeline responded"
     if (( MARK_DONE == 1 )); then
       gh issue edit "$issue" --repo "$GH_REPO" --remove-label status:ready >/dev/null 2>&1 || true
+      gh issue edit "$issue" --repo "$GH_REPO" --remove-label status:running >/dev/null 2>&1 || true
       gh issue edit "$issue" --repo "$GH_REPO" --add-label status:done >/dev/null 2>&1 || true
-      echo "[smoke] Marked issue #$issue as status:done"
+      echo "[smoke] Marked issue #$issue as status:done (removed status:ready/status:running)"
     fi
     exit 0
   fi
