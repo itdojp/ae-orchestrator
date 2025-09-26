@@ -38,7 +38,7 @@ gh issue edit "$issue" --repo "$GH_REPO" --remove-label status:running >/dev/nul
 gh issue edit "$issue" --repo "$GH_REPO" --add-label status:ready >/dev/null || true
 echo "[smoke] Labeled #$issue with: $AGENT_ROLE, status:ready"
 
-echo "[smoke] Waiting for watcher to transition to status:running and post /start ..."
+echo "[smoke] Waiting for watcher to transition (remove status:ready and/or add status:running) and post /start ..."
 start_ts=$(date -u +%s)
 found_running=0
 found_start_comment=0
@@ -50,6 +50,9 @@ while true; do
   j=$(gh issue view "$issue" --repo "$GH_REPO" --json labels,comments --jq '{labels:[.labels[].name], comments:(.comments // [])}') || j='{}'
   if printf '%s' "$j" | jq -e '.labels | index("status:running")' >/dev/null; then
     (( found_running==0 )) && echo "[smoke] Detected status:running label"
+    found_running=1
+  elif printf '%s' "$j" | jq -e '(.labels | index("status:ready")) | not' >/dev/null; then
+    (( found_running==0 )) && echo "[smoke] Detected status:ready removed (treated as running)"
     found_running=1
   fi
   if printf '%s' "$j" | jq -e '.comments | map(.body=="/start") | any' >/dev/null; then
@@ -66,4 +69,3 @@ done
 
 echo "[smoke] FAILED: conditions not met (running=${found_running}, start=${found_start_comment})"
 exit 1
-

@@ -50,10 +50,21 @@ while true; do
     if gh issue comment "$issue" --repo "$GH_REPO" --body "/start"; then
       emit dispatch "issue=$issue action=/start"; log "Dispatched /start to #$issue successfully"
       # Prevent repeated dispatching: move issue out of READY queue
-      if gh issue edit "$issue" --repo "$GH_REPO" --remove-label status:ready --add-label status:running >/dev/null 2>&1; then
-        emit state "issue=$issue label:status:ready->status:running"; log "Transitioned labels for #$issue: status:ready -> status:running"
+      # 1) Remove status:ready (best-effort)
+      if gh issue edit "$issue" --repo "$GH_REPO" --remove-label status:ready >/dev/null 2>&1; then
+        emit state "issue=$issue label:removed status:ready"; log "Removed label from #$issue: status:ready"
       else
-        emit warn "issue=$issue label-transition failed"; log "Warning: failed to transition labels for #$issue (ready->running)"
+        emit warn "issue=$issue remove status:ready failed"; log "Warning: failed to remove status:ready for #$issue"
+      fi
+      # 2) Add status:running only if the label exists in the repo
+      if gh label list --repo "$GH_REPO" --limit 200 --json name | jq -e '.[] | select(.name=="status:running")' >/dev/null 2>&1; then
+        if gh issue edit "$issue" --repo "$GH_REPO" --add-label status:running >/dev/null 2>&1; then
+          emit state "issue=$issue label:added status:running"; log "Added label to #$issue: status:running"
+        else
+          emit warn "issue=$issue add status:running failed"; log "Warning: failed to add status:running for #$issue"
+        fi
+      else
+        emit warn "issue=$issue label status:running not defined"; log "Label 'status:running' not found in repo; skipped adding to #$issue"
       fi
       if [[ "${CODEX_BRIDGE:-}" == "zellij" && -n "${ZELLIJ_SESSION:-}" ]]; then scripts/runner/bridge-zellij.sh "$issue" || true; fi
       if [[ "${CODEX_EXEC:-}" == "1" && -n "${AGENT_WORKDIR:-}" ]]; then scripts/runner/exec.sh "$issue" || true; fi
