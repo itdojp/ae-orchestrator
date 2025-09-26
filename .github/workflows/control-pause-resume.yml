@@ -1,0 +1,126 @@
+name: Orchestrator Control (/pause, /resume)
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  control:
+    if: ${{ github.event.issue.pull_request == null }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Handle /pause and /resume
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = (context.payload.comment.body || '').trim();
+            const isPause = /^\/pause(\s+role:([A-Za-z0-9:-]+))?\s*$/.exec(body);
+            const isResume = /^\/resume(\s+role:([A-Za-z0-9:-]+))?\s*$/.exec(body);
+            if (!isPause && !isResume) {
+              core.info('No control command');
+              return;
+            }
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            async function ensureLabel(name, color) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name });
+              } catch (e) {
+                try { await github.rest.issues.createLabel({ owner, repo, name, color }); } catch {}
+              }
+            }
+
+            // Ensure control labels exist
+            await ensureLabel('orchestrator:control', '6f42c1');
+            await ensureLabel('orchestrator:paused', '6f42c1');
+            await ensureLabel('paused:queued', '6f42c1');
+            await ensureLabel('autopilot:off', '6f42c1');
+
+            // Find or create control issue
+            let controlIssue = null;
+            const controls = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', labels: 'orchestrator:control', per_page: 100 });
+            if (controls.length) controlIssue = controls[0];
+            if (!controlIssue) {
+              const created = await github.rest.issues.create({ owner, repo, title: 'Control: Orchestrator global/role pause', body: '運用用の停止/再開ラベルを付け外しするためのコントロールIssueです。', labels: ['orchestrator:control'] });
+              controlIssue = created.data;
+            }
+
+            async function addLabelToIssue(number, name) {
+              try { await github.rest.issues.addLabels({ owner, repo, issue_number: number, labels: [name] }); } catch {}
+            }
+            async function removeLabelFromIssue(number, name) {
+              try { await github.rest.issues.removeLabel({ owner, repo, issue_number: number, name }); } catch {}
+            }
+
+            async function freezeQueue(filterLabels) {
+              const params = { owner, repo, state: 'open', labels: ['status:ready', ...filterLabels].join(','), per_page: 100 };
+              const list = await github.paginate(github.rest.issues.listForRepo, params);
+              for (const it of list) {
+                await addLabelToIssue(it.number, 'paused:queued');
+                await removeLabelFromIssue(it.number, 'status:ready');
+              }
+            }
+            async function unfreezeQueue(filterLabels) {
+              const params = { owner, repo, state: 'open', labels: ['paused:queued', ...filterLabels].join(','), per_page: 100 };
+              const list = await github.paginate(github.rest.issues.listForRepo, params);
+              for (const it of list) {
+                await addLabelToIssue(it.number, 'status:ready');
+                await removeLabelFromIssue(it.number, 'paused:queued');
+              }
+            }
+            async function setAutopilotOff(filterLabels) {
+              const labels = filterLabels.length ? filterLabels.join(',') : undefined;
+              const params = { owner, repo, state: 'open', per_page: 100 };
+              if (labels) params.labels = labels;
+              const list = await github.paginate(github.rest.issues.listForRepo, params);
+              for (const it of list) {
+                await addLabelToIssue(it.number, 'autopilot:off');
+              }
+            }
+            async function clearAutopilotOff(filterLabels) {
+              const params = { owner, repo, state: 'open', labels: ['autopilot:off', ...filterLabels].join(','), per_page: 100 };
+              const list = await github.paginate(github.rest.issues.listForRepo, params);
+              for (const it of list) {
+                await removeLabelFromIssue(it.number, 'autopilot:off');
+              }
+            }
+
+            if (isPause) {
+              const role = isPause[2];
+              if (role) {
+                const roleLabel = `paused:role:${role}`;
+                await ensureLabel(roleLabel, '6f42c1');
+                await addLabelToIssue(controlIssue.number, roleLabel);
+                await freezeQueue([role]);
+                await setAutopilotOff([role]);
+                core.notice(`Paused role: ${role}`);
+              } else {
+                await addLabelToIssue(controlIssue.number, 'orchestrator:paused');
+                await freezeQueue([]);
+                await setAutopilotOff([]);
+                core.notice('Paused globally');
+              }
+              return;
+            }
+
+            if (isResume) {
+              const role = isResume[2];
+              if (role) {
+                const roleLabel = `paused:role:${role}`;
+                await removeLabelFromIssue(controlIssue.number, roleLabel);
+                await unfreezeQueue([role]);
+                await clearAutopilotOff([role]);
+                core.notice(`Resumed role: ${role}`);
+              } else {
+                await removeLabelFromIssue(controlIssue.number, 'orchestrator:paused');
+                await unfreezeQueue([]);
+                await clearAutopilotOff([]);
+                core.notice('Resumed globally');
+              }
+            }
