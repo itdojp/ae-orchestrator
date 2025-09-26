@@ -5,6 +5,7 @@ set -euo pipefail
 : "${AGENT_ROLE:?AGENT_ROLE is required (e.g. role:IMPL-MED-1)}"
 WATCH_INTERVAL="${WATCH_INTERVAL:-60}"
 DISPATCH_COOLDOWN_SECONDS="${DISPATCH_COOLDOWN_SECONDS:-600}"
+WATCH_DRY_RUN="${WATCH_DRY_RUN:-0}"
 
 # Options
 RUN_ONCE=0
@@ -67,6 +68,9 @@ while true; do
         log "Skipping dispatch to #$issue due to cooldown (last /start at $last_start_ts)"; emit skip "issue=$issue reason=cooldown last_start=$last_start_ts";
         write_status running "$cycle_ts" "$issue_snapshot" "$issue" "/start" skipped:cooldown "$act_ts"; continue
       fi
+    fi
+    if (( WATCH_DRY_RUN == 1 )); then
+      log "[dry-run] Would dispatch /start to #$issue (skip comment/labels/runners)"; emit dispatch "issue=$issue action=/start dry-run=1"; write_status running "$cycle_ts" "$issue_snapshot" "$issue" "/start" dry-run "$act_ts"; continue
     fi
     if gh issue comment "$issue" --repo "$GH_REPO" --body "/start"; then
       emit dispatch "issue=$issue action=/start"; log "Dispatched /start to #$issue successfully"
