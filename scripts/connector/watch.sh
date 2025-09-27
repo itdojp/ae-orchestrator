@@ -66,7 +66,9 @@ while true; do
     sleep "$WATCH_INTERVAL"; continue
   fi
   # Collect READY issues for the role and drop ones already marked status:running to avoid re-dispatch
-  if ! issues_json=$(gh issue list --repo "$GH_REPO" --label "$AGENT_ROLE" --label status:ready --json number,title,labels); then
+  if issues_json=$(gh issue list --repo "$GH_REPO" --label "$AGENT_ROLE" --label status:ready --json number,title,labels); then
+    :
+  else
     rc=$?
     log "Failed to list ready issues (exit=$rc); retrying after sleep"
     emit error "list-ready exit=$rc"
