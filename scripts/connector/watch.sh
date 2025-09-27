@@ -35,8 +35,36 @@ log "Watcher started for $agent_name ($AGENT_ROLE) on $GH_REPO (interval=${WATCH
 emit startup "interval=${WATCH_INTERVAL}s"
 write_status running "$(now)" '[]' "" startup ready "$(now)"
 
+
+is_global_paused(){
+  gh issue list --repo "$GH_REPO" --state open \
+    --label orchestrator:control --label orchestrator:paused \
+    --json totalCount -q '.totalCount>0' >/dev/null 2>&1
+}
+
+is_role_paused(){
+  local raw_role="${AGENT_ROLE#role:}"
+  gh issue list --repo "$GH_REPO" --state open \
+    --label orchestrator:control --label "paused:role:${raw_role}" \
+    --json totalCount -q '.totalCount>0' >/dev/null 2>&1 || \
+  gh issue list --repo "$GH_REPO" --state open \
+    --label orchestrator:control --label "paused:${AGENT_ROLE}" \
+    --json totalCount -q '.totalCount>0' >/dev/null 2>&1
+}
 while true; do
   cycle_ts="$(now)"
+  if is_global_paused; then
+    log "Global pause active (orchestrator:paused) — skipping cycle"
+    emit idle "paused=global"
+    write_status running "$cycle_ts" "[]" "" idle paused-global "$cycle_ts"
+    sleep "$WATCH_INTERVAL"; continue
+  fi
+  if is_role_paused; then
+    log "Role pause active — skipping cycle"
+    emit idle "paused=role"
+    write_status running "$cycle_ts" "[]" "" idle paused-role "$cycle_ts"
+    sleep "$WATCH_INTERVAL"; continue
+  fi
   mapfile -t issues < <(gh issue list --repo "$GH_REPO" --label "$AGENT_ROLE" --label status:ready --json number,title | jq -r '.[].number')
   issue_snapshot="$(printf '%s\n' "${issues[@]:-}" | jq -R -s 'split("\n") | map(select(length>0) | tonumber)')"
 
