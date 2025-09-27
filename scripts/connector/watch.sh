@@ -77,7 +77,8 @@ while true; do
   fi
   filtered_json=$(jq '[.[] | select(((.labels // []) | map(.name)) | index("status:running") | not)]' <<<"$issues_json")
   mapfile -t issues < <(jq -r '.[].number' <<<"$filtered_json")
-  issue_snapshot="$(jq -c 'map(.number)' <<<"$filtered_json")"
+  pending_snapshot="$(jq -c 'map(.number)' <<<"$filtered_json")"
+  ready_snapshot="$(jq -c 'map(.number)' <<<"$issues_json")"
   total_ready=$(jq 'length' <<<"$issues_json")
   pending_ready=$(jq 'length' <<<"$filtered_json")
   skipped_ready=$(( total_ready - pending_ready ))
@@ -91,11 +92,11 @@ while true; do
     if (( total_ready == 0 )); then
       log "No ready issues found; sleeping ${WATCH_INTERVAL}s"
       emit idle "queue=0"
-      write_status running "$cycle_ts" "$issue_snapshot" "" idle queue-empty "$cycle_ts"
+      write_status running "$cycle_ts" "$ready_snapshot" "" idle queue-empty "$cycle_ts"
     else
       log "Ready issues already running; sleeping ${WATCH_INTERVAL}s"
       emit idle "queue-running"
-      write_status running "$cycle_ts" "$issue_snapshot" "" idle queue-running "$cycle_ts"
+      write_status running "$cycle_ts" "$ready_snapshot" "" idle queue-running "$cycle_ts"
     fi
     sleep "$WATCH_INTERVAL"; continue
   fi
@@ -120,9 +121,9 @@ while true; do
       if [[ "${CODEX_BRIDGE:-}" == "zellij" && -n "${ZELLIJ_SESSION:-}" ]]; then scripts/runner/bridge-zellij.sh "$issue" || true; fi
       if [[ "${CODEX_EXEC:-}" == "1" && -n "${AGENT_WORKDIR:-}" ]]; then scripts/runner/exec.sh "$issue" || true; fi
       if [[ "${CODEX_AUTOPILOT:-}" == "1" && -n "${ZELLIJ_SESSION:-}" ]]; then scripts/autopilot.sh "$issue" >/dev/null 2>&1 & disown || true; fi
-      write_status running "$cycle_ts" "$issue_snapshot" "$issue" "/start" ok "$act_ts"
+      write_status running "$cycle_ts" "$pending_snapshot" "$issue" "/start" ok "$act_ts"
     else
-      rc=$?; emit error "issue=$issue action=/start exit=$rc"; log "Failed to dispatch /start to #$issue (exit=$rc)"; write_status running "$cycle_ts" "$issue_snapshot" "$issue" "/start" "error:$rc" "$act_ts"
+      rc=$?; emit error "issue=$issue action=/start exit=$rc"; log "Failed to dispatch /start to #$issue (exit=$rc)"; write_status running "$cycle_ts" "$pending_snapshot" "$issue" "/start" "error:$rc" "$act_ts"
     fi
   done
   sleep "$WATCH_INTERVAL"
