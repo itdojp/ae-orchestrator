@@ -82,6 +82,7 @@ while true; do
   if (( skipped_ready > 0 )); then
     skipped_list=$(jq -r '[.[] | select(((.labels // []) | map(.name)) | index("status:running")) | .number] | join(", ")' <<<"$issues_json")
     log "Skipping ${skipped_ready} ready issue(s) already labeled status:running: ${skipped_list:-none}"
+    emit idle "queue-skip count=${skipped_ready} issues=${skipped_list:-none}"
   fi
 
   if (( pending_ready == 0 )); then
