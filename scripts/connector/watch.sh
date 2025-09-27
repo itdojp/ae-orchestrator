@@ -66,7 +66,13 @@ while true; do
     sleep "$WATCH_INTERVAL"; continue
   fi
   # Collect READY issues for the role and drop ones already marked status:running to avoid re-dispatch
-  issues_json=$(gh issue list --repo "$GH_REPO" --label "$AGENT_ROLE" --label status:ready --json number,title,labels)
+  if ! issues_json=$(gh issue list --repo "$GH_REPO" --label "$AGENT_ROLE" --label status:ready --json number,title,labels); then
+    rc=$?
+    log "Failed to list ready issues (exit=$rc); retrying after sleep"
+    emit error "list-ready exit=$rc"
+    sleep "$WATCH_INTERVAL"
+    continue
+  fi
   filtered_json=$(jq '[.[] | select(((.labels // []) | map(.name)) | index("status:running") | not)]' <<<"$issues_json")
   mapfile -t issues < <(jq -r '.[].number' <<<"$filtered_json")
   issue_snapshot="$(jq -c 'map(.number)' <<<"$filtered_json")"
