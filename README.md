@@ -60,6 +60,7 @@ scripts/telemetry/status-board.sh --events 50  # 直近イベント
 - Autopilot: `CODEX_AUTOPILOT=1` と `CODEX_AUTOPILOT_INTERVAL` / `CODEX_AUTOPILOT_COOLDOWN` を必要に応じて調整
 - ラベル整備: `DRY_RUN=1 GH_REPO=... scripts/admin/seed-labels.sh` で不足ラベルを確認（DRY_RUN=0 で反映）
 - ログメンテナンス: `MAX_LINES=2000 scripts/telemetry/trim-logs.sh` を定期実行し `telemetry/` 下の肥大化を防止
+- テレメトリ: `queue-skip` イベントは `status:running` 済みの READY 課題をスキップしたことを示す。`list-ready exit=<code>` は `gh` 失敗からのリトライログ。
 - スモーク: `GH_REPO=... AGENT_ROLE=... scripts/smoke/impl1.sh --mark-done` で READY→RUNNING→DONE の経路を随時検証
 
 ```
