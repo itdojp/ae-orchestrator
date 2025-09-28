@@ -1,0 +1,10 @@
+[Unit]
+Description=Run AE Telemetry Archive hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=ae-telemetry-archive.service
+
+[Install]
+WantedBy=timers.target

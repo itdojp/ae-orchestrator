@@ -1,0 +1,22 @@
+{
+  "epic": "AE-DOCS",
+  "sprint": "sprint0",
+  "tasks": [
+    {
+      "id": "docs-001",
+      "title": "Document telemetry workflow",
+      "body": "Outline steps for telemetry report generation and publication.",
+      "role": "role:IMPL-DOCS-1",
+      "labels": ["area:docs"],
+      "ready": true
+    },
+    {
+      "id": "docs-002",
+      "title": "Update runbook FAQ",
+      "body": "Add troubleshooting steps for new automation.",
+      "role": "role:IMPL-DOCS-1",
+      "labels": ["priority:P2"],
+      "ready": false
+    }
+  ]
+}

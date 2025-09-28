@@ -1,0 +1,22 @@
+{
+  "epic": "AE-IMPL",
+  "sprint": "sprint0",
+  "tasks": [
+    {
+      "id": "impl-001",
+      "title": "Implement feature increment",
+      "body": "Describe implementation details and acceptance criteria.",
+      "role": "role:IMPL-MED-1",
+      "labels": ["priority:P1", "area:core"],
+      "ready": true
+    },
+    {
+      "id": "impl-002",
+      "title": "Add regression tests",
+      "body": "List impacted modules and required test coverage.",
+      "role": "role:IMPL-MED-1",
+      "labels": ["area:test"],
+      "ready": false
+    }
+  ]
+}

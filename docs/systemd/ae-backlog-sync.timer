@@ -1,0 +1,10 @@
+[Unit]
+Description=Run AE Backlog Sync daily
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+Unit=ae-backlog-sync.service
+
+[Install]
+WantedBy=timers.target

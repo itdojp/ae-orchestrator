@@ -1,0 +1,10 @@
+[Unit]
+Description=Run AE Smoke for %i every hour
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=ae-smoke@%i.service
+
+[Install]
+WantedBy=timers.target

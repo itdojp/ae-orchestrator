@@ -1,0 +1,13 @@
+[Unit]
+Description=AE Backlog Sync
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/work/CodeX/ae-orch-work/ae-orchestrator
+Environment=GH_REPO=itdojp/ae-orchestrator
+Environment=BACKLOG_GLOB=scripts/backlog/*.json
+ExecStart=/usr/bin/bash scripts/backlog/run-cron-wrapper.sh
+
+[Install]
+WantedBy=default.target

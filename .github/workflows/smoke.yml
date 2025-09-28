@@ -1,0 +1,41 @@
+name: Smoke Test
+
+on:
+  schedule:
+    - cron: '30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    if: ${{ secrets.AE_GH_REPO != '' && secrets.AE_SMOKE_ROLE != '' }}
+    runs-on: ubuntu-latest
+    env:
+      GH_REPO: ${{ secrets.AE_GH_REPO }}
+      AGENT_ROLE: ${{ secrets.AE_SMOKE_ROLE }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      WEBHOOK_URL: ${{ secrets.AE_SMOKE_WEBHOOK }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq gh
+
+      - name: Run smoke test
+        run: |
+          scripts/smoke/run-periodic.sh
+
+      - name: Notify issue on failure
+        if: failure()
+        env:
+          ISSUE_NUMBER: ${{ secrets.AE_SMOKE_ISSUE }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$ISSUE_NUMBER" ]; then
+            echo "No issue configured for smoke notifications"
+            exit 0
+          fi
+          TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          gh issue comment "$ISSUE_NUMBER" --body "Smoke test failed at $TIMESTAMP (workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)."
