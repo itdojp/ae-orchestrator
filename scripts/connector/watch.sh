@@ -4,6 +4,17 @@ set -euo pipefail
 : "${GH_REPO:?GH_REPO is required (e.g. owner/repo)}"
 : "${AGENT_ROLE:?AGENT_ROLE is required (e.g. role:IMPL-MED-1)}"
 WATCH_INTERVAL="${WATCH_INTERVAL:-60}"
+DISPATCH_COOLDOWN_SECONDS="${DISPATCH_COOLDOWN_SECONDS:-600}"
+WATCH_DRY_RUN="${WATCH_DRY_RUN:-0}"
+
+RUN_ONCE=0
+while (($#)); do
+  case "$1" in
+    --once) RUN_ONCE=1; shift;;
+    --help|-h) echo "Usage: $0 [--once]"; exit 0;;
+    *) echo "Unknown option: $1" >&2; exit 1;;
+  esac
+done
 
 root_dir="$(cd "$(dirname "$0")/../.." && pwd)"
 log_dir="$root_dir/telemetry/logs"
@@ -35,7 +46,6 @@ log "Watcher started for $agent_name ($AGENT_ROLE) on $GH_REPO (interval=${WATCH
 emit startup "interval=${WATCH_INTERVAL}s"
 write_status running "$(now)" '[]' "" startup ready "$(now)"
 
-
 is_global_paused(){
   gh issue list --repo "$GH_REPO" --state open \
     --label orchestrator:control --label orchestrator:paused \
@@ -51,21 +61,22 @@ is_role_paused(){
     --label orchestrator:control --label "paused:${AGENT_ROLE}" \
     --json totalCount -q '.totalCount>0' >/dev/null 2>&1
 }
+
 while true; do
   cycle_ts="$(now)"
   if is_global_paused; then
     log "Global pause active (orchestrator:paused) — skipping cycle"
     emit idle "paused=global"
-    write_status running "$cycle_ts" "[]" "" idle paused-global "$cycle_ts"
+    write_status running "$cycle_ts" '[]' "" idle paused-global "$cycle_ts"
     sleep "$WATCH_INTERVAL"; continue
   fi
   if is_role_paused; then
     log "Role pause active — skipping cycle"
     emit idle "paused=role"
-    write_status running "$cycle_ts" "[]" "" idle paused-role "$cycle_ts"
+    write_status running "$cycle_ts" '[]' "" idle paused-role "$cycle_ts"
     sleep "$WATCH_INTERVAL"; continue
   fi
-  # Collect READY issues for the role and drop ones already marked status:running to avoid re-dispatch
+
   if issues_json=$(gh issue list --repo "$GH_REPO" --label "$AGENT_ROLE" --label status:ready --json number,title,labels); then
     :
   else
@@ -75,6 +86,7 @@ while true; do
     sleep "$WATCH_INTERVAL"
     continue
   fi
+
   filtered_json=$(jq '[.[] | select(((.labels // []) | map(.name)) | index("status:running") | not)]' <<<"$issues_json")
   mapfile -t issues < <(jq -r '.[].number' <<<"$filtered_json")
   pending_snapshot="$(jq -c 'map(.number)' <<<"$filtered_json")"
@@ -101,11 +113,34 @@ while true; do
     sleep "$WATCH_INTERVAL"; continue
   fi
 
-  log "Found ${pending_ready} ready issue(s): ${issues[*]}"; emit queue "count=${pending_ready} issues=${issues[*]}"
+  log "Found ${pending_ready} ready issue(s): ${issues[*]}"
+  emit queue "count=${pending_ready} issues=${issues[*]}"
+
   for issue in "${issues[@]}"; do
     act_ts="$(now)"; log "Dispatching /start to #$issue"
+
+    last_start_ts=$(gh issue view "$issue" --repo "$GH_REPO" --json comments 2>/dev/null | jq -r '.comments | map(select(.body=="/start") | .createdAt) | sort | last // empty') || last_start_ts=""
+    if [[ -n "$last_start_ts" && "$last_start_ts" != "null" ]]; then
+      last_epoch=$(date -u -d "$last_start_ts" +%s 2>/dev/null || date -u +%s)
+      now_epoch=$(date -u +%s)
+      if (( now_epoch - last_epoch < DISPATCH_COOLDOWN_SECONDS )); then
+        log "Skipping dispatch to #$issue due to cooldown (last /start at $last_start_ts)"
+        emit skip "issue=$issue reason=cooldown last_start=$last_start_ts"
+        write_status running "$cycle_ts" "$pending_snapshot" "$issue" "/start" skipped:cooldown "$act_ts"
+        continue
+      fi
+    fi
+
+    if (( WATCH_DRY_RUN == 1 )); then
+      log "[dry-run] Would dispatch /start to #$issue (skip comment/labels/runners)"
+      emit dispatch "issue=$issue action=/start dry-run=1"
+      write_status running "$cycle_ts" "$pending_snapshot" "$issue" "/start" dry-run "$act_ts"
+      continue
+    fi
+
     if gh issue comment "$issue" --repo "$GH_REPO" --body "/start"; then
-      emit dispatch "issue=$issue action=/start"; log "Dispatched /start to #$issue successfully"
+      emit dispatch "issue=$issue action=/start"
+      log "Dispatched /start to #$issue successfully"
       if gh issue edit "$issue" --repo "$GH_REPO" --remove-label status:ready >/dev/null 2>&1; then
         log "Removed status:ready from #$issue"
       else
@@ -123,8 +158,19 @@ while true; do
       if [[ "${CODEX_AUTOPILOT:-}" == "1" && -n "${ZELLIJ_SESSION:-}" ]]; then scripts/autopilot.sh "$issue" >/dev/null 2>&1 & disown || true; fi
       write_status running "$cycle_ts" "$pending_snapshot" "$issue" "/start" ok "$act_ts"
     else
-      rc=$?; emit error "issue=$issue action=/start exit=$rc"; log "Failed to dispatch /start to #$issue (exit=$rc)"; write_status running "$cycle_ts" "$pending_snapshot" "$issue" "/start" "error:$rc" "$act_ts"
+      rc=$?
+      emit error "issue=$issue action=/start exit=$rc"
+      log "Failed to dispatch /start to #$issue (exit=$rc)"
+      write_status running "$cycle_ts" "$pending_snapshot" "$issue" "/start" "error:$rc" "$act_ts"
     fi
   done
+
+  if (( RUN_ONCE == 1 )); then
+    log "Run-once mode: exiting after one cycle"
+    emit shutdown "mode=once"
+    write_status stopped "$(now)" "$pending_snapshot" "" stopped once "$(now)"
+    break
+  fi
+
   sleep "$WATCH_INTERVAL"
 done
