@@ -117,7 +117,8 @@ while true; do
   emit queue "count=${pending_ready} issues=${issues[*]}"
 
   for issue in "${issues[@]}"; do
-    act_ts="$(now)"; log "Dispatching /start to #$issue"
+    act_ts="$(now)"
+    log "Evaluating #$issue for dispatch"
 
     last_start_ts=$(gh issue view "$issue" --repo "$GH_REPO" --json comments 2>/dev/null | jq -r '.comments | map(select(.body=="/start") | .createdAt) | sort | last // empty') || last_start_ts=""
     if [[ -n "$last_start_ts" && "$last_start_ts" != "null" ]]; then
@@ -139,6 +140,7 @@ while true; do
     fi
 
     if gh issue comment "$issue" --repo "$GH_REPO" --body "/start"; then
+      log "Dispatching /start to #$issue"
       emit dispatch "issue=$issue action=/start"
       log "Dispatched /start to #$issue successfully"
       if gh issue edit "$issue" --repo "$GH_REPO" --remove-label status:ready >/dev/null 2>&1; then
