@@ -1,0 +1,59 @@
+name: Exec Healthcheck
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  exec-healthcheck:
+    if: ${{ secrets.CODEX_TOKEN != '' && secrets.AE_HEALTHCHECK_ISSUE != '' }}
+    runs-on: ubuntu-latest
+    env:
+      GH_REPO: ${{ secrets.AE_GH_REPO }}
+      AGENT_WORKDIR: ${{ github.workspace }}
+      HEALTHCHECK_ISSUE: ${{ secrets.AE_HEALTHCHECK_ISSUE }}
+      CODEX_TOKEN: ${{ secrets.CODEX_TOKEN }}
+      CODEX_API_BASE: ${{ secrets.CODEX_API_BASE }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Install GitHub CLI
+        run: sudo apt-get install -y gh
+
+      - name: Install Codex CLI
+        run: |
+          if ! command -v codex >/dev/null 2>&1; then
+            curl -fsSL https://cli.codex.run/install.sh | sudo bash
+          fi
+
+      - name: Configure Codex auth
+        run: |
+          mkdir -p "$HOME/.codex"
+          cat > "$HOME/.codex/auth.json" <<JSON
+          {"token": "${CODEX_TOKEN}", "api_base": "${CODEX_API_BASE:-https://api.codex.run}"}
+          JSON
+
+      - name: Run exec fallback healthcheck
+        run: |
+          export GH_REPO=${GH_REPO:-itdojp/ae-orchestrator}
+          export AGENT_WORKDIR=${AGENT_WORKDIR:-$PWD}
+          scripts/runner/exec-healthcheck.sh "$HEALTHCHECK_ISSUE"
+
+      - name: Comment on healthcheck failure
+        if: failure()
+        env:
+          ISSUE_NUMBER: ${{ secrets.AE_HEALTHCHECK_ISSUE }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$ISSUE_NUMBER" ]; then
+            echo "No issue configured for healthcheck comments"
+            exit 0
+          fi
+          TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          gh issue comment "$ISSUE_NUMBER" --body "Exec fallback healthcheck failed at $TIMESTAMP (workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)."

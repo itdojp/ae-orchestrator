@@ -1,0 +1,41 @@
+name: Telemetry Report
+
+on:
+  schedule:
+    - cron: '15 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    env:
+      S3_BUCKET: ${{ secrets.AE_TELEMETRY_BUCKET }}
+      S3_PREFIX: ${{ secrets.AE_TELEMETRY_PREFIX }}
+      WEBHOOK_URL: ${{ secrets.AE_TELEMETRY_WEBHOOK }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq awscli curl
+
+      - name: Generate telemetry reports
+        run: |
+          mkdir -p telemetry
+          scripts/telemetry/report.sh telemetry/events.ndjson > telemetry/report-$(date -u +%Y%m%d).txt || true
+          scripts/telemetry/report-html.sh telemetry/events.ndjson telemetry/report-$(date -u +%Y%m%d).html || true
+
+      - name: Publish reports
+        if: env.S3_BUCKET != '' || env.WEBHOOK_URL != ''
+        run: scripts/telemetry/publish-reports.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: telemetry-report
+          path: |
+            telemetry/report-*.txt
+            telemetry/report-*.html
+          if-no-files-found: ignore

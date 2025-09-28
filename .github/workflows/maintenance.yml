@@ -1,0 +1,51 @@
+name: Maintenance
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    env:
+      GH_REPO: ${{ secrets.AE_GH_REPO }}
+      AGENT_ROLE: ${{ secrets.AE_SMOKE_ROLE }}
+      WEBHOOK_URL: ${{ secrets.AE_MAINTENANCE_WEBHOOK }}
+      RUN_BACKLOG_SYNC: ${{ secrets.AE_RUN_BACKLOG_SYNC || '0' }}
+      AE_TELEMETRY_BUCKET: ${{ secrets.AE_TELEMETRY_BUCKET }}
+      AE_TELEMETRY_PREFIX: ${{ secrets.AE_TELEMETRY_PREFIX }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq gh curl awscli
+
+      - name: Run maintenance script
+        run: scripts/ops/run-maintenance.sh
+
+      - name: Publish telemetry reports
+        if: env.AE_TELEMETRY_BUCKET != '' || env.WEBHOOK_URL != ''
+        env:
+          S3_BUCKET: ${{ env.AE_TELEMETRY_BUCKET }}
+          S3_PREFIX: ${{ env.AE_TELEMETRY_PREFIX }}
+          WEBHOOK_URL: ${{ env.WEBHOOK_URL }}
+        run: scripts/telemetry/publish-reports.sh
+
+      - name: Notify webhook (fallback)
+        if: env.WEBHOOK_URL != ''
+        run: |
+          payload=$(jq -n --arg msg "maintenance completed" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '{text:$msg,at:$at}')
+          curl -fsS -H 'Content-Type: application/json' -d "$payload" "$WEBHOOK_URL" || true
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: maintenance-report
+          path: |
+            telemetry/report-*.txt
+            telemetry/report-*.html
+          if-no-files-found: ignore

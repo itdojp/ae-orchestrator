@@ -1,0 +1,22 @@
+[Unit]
+Description=AE Orchestrator Watcher for %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/work/CodeX/ae-orch-work/ae-orchestrator
+Environment=GH_REPO=itdojp/ae-orchestrator
+Environment=AGENT_ROLE=%i
+Environment=CODEX_BRIDGE=zellij
+Environment=ZELLIJ_SESSION=codex-impl-1
+Environment=WATCH_INTERVAL=60
+ExecStartPre=%h/work/CodeX/ae-orch-work/ae-orchestrator/scripts/admin/check-gh-auth.sh
+ExecStartPre=%h/work/CodeX/ae-orch-work/ae-orchestrator/scripts/runner/ensure-zellij.sh
+ExecStart=/usr/bin/bash %h/work/CodeX/ae-orch-work/ae-orchestrator/scripts/connector/start-watcher.sh
+ExecStopPost=%h/work/CodeX/ae-orch-work/ae-orchestrator/scripts/runner/log-zellij-status.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

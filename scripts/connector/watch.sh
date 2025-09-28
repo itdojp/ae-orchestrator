@@ -65,24 +65,65 @@ while true; do
     write_status running "$cycle_ts" "[]" "" idle paused-role "$cycle_ts"
     sleep "$WATCH_INTERVAL"; continue
   fi
-  mapfile -t issues < <(gh issue list --repo "$GH_REPO" --label "$AGENT_ROLE" --label status:ready --json number,title | jq -r '.[].number')
-  issue_snapshot="$(printf '%s\n' "${issues[@]:-}" | jq -R -s 'split("\n") | map(select(length>0) | tonumber)')"
-
-  if ((${#issues[@]} == 0)); then
-    log "No ready issues found; sleeping ${WATCH_INTERVAL}s"; emit idle "queue=0"; write_status running "$cycle_ts" "$issue_snapshot" "" idle queue-empty "$cycle_ts"; sleep "$WATCH_INTERVAL"; continue
+  # Collect READY issues for the role and drop ones already marked status:running to avoid re-dispatch
+  if issues_json=$(gh issue list --repo "$GH_REPO" --label "$AGENT_ROLE" --label status:ready --json number,title,labels); then
+    :
+  else
+    rc=$?
+    log "Failed to list ready issues (exit=$rc); retrying after sleep"
+    emit error "list-ready exit=$rc"
+    sleep "$WATCH_INTERVAL"
+    continue
+  fi
+  filtered_json=$(jq '[.[] | select(((.labels // []) | map(.name)) | index("status:running") | not)]' <<<"$issues_json")
+  mapfile -t issues < <(jq -r '.[].number' <<<"$filtered_json")
+  pending_snapshot="$(jq -c 'map(.number)' <<<"$filtered_json")"
+  ready_snapshot="$(jq -c 'map(.number)' <<<"$issues_json")"
+  total_ready=$(jq 'length' <<<"$issues_json")
+  pending_ready=$(jq 'length' <<<"$filtered_json")
+  skipped_ready=$(( total_ready - pending_ready ))
+  if (( skipped_ready > 0 )); then
+    skipped_list=$(jq -r '[.[] | select(((.labels // []) | map(.name)) | index("status:running")) | .number] | join(", ")' <<<"$issues_json")
+    log "Skipping ${skipped_ready} ready issue(s) already labeled status:running: ${skipped_list:-none}"
+    emit idle "queue-skip count=${skipped_ready} issues=${skipped_list:-none}"
   fi
 
-  log "Found ${#issues[@]} ready issue(s): ${issues[*]}"; emit queue "count=${#issues[@]} issues=${issues[*]}"
+  if (( pending_ready == 0 )); then
+    if (( total_ready == 0 )); then
+      log "No ready issues found; sleeping ${WATCH_INTERVAL}s"
+      emit idle "queue=0"
+      write_status running "$cycle_ts" "$ready_snapshot" "" idle queue-empty "$cycle_ts"
+    else
+      log "Ready issues already running; sleeping ${WATCH_INTERVAL}s"
+      emit idle "queue-running"
+      write_status running "$cycle_ts" "$ready_snapshot" "" idle queue-running "$cycle_ts"
+    fi
+    sleep "$WATCH_INTERVAL"; continue
+  fi
+
+  log "Found ${pending_ready} ready issue(s): ${issues[*]}"; emit queue "count=${pending_ready} issues=${issues[*]}"
   for issue in "${issues[@]}"; do
     act_ts="$(now)"; log "Dispatching /start to #$issue"
     if gh issue comment "$issue" --repo "$GH_REPO" --body "/start"; then
       emit dispatch "issue=$issue action=/start"; log "Dispatched /start to #$issue successfully"
+      if gh issue edit "$issue" --repo "$GH_REPO" --remove-label status:ready >/dev/null 2>&1; then
+        log "Removed status:ready from #$issue"
+      else
+        rc=$?
+        log "Unable to remove status:ready from #$issue (exit=$rc)"
+      fi
+      if gh issue edit "$issue" --repo "$GH_REPO" --add-label status:running >/dev/null 2>&1; then
+        log "Applied status:running to #$issue"
+      else
+        rc=$?
+        log "Unable to add status:running to #$issue (exit=$rc)"
+      fi
       if [[ "${CODEX_BRIDGE:-}" == "zellij" && -n "${ZELLIJ_SESSION:-}" ]]; then scripts/runner/bridge-zellij.sh "$issue" || true; fi
       if [[ "${CODEX_EXEC:-}" == "1" && -n "${AGENT_WORKDIR:-}" ]]; then scripts/runner/exec.sh "$issue" || true; fi
       if [[ "${CODEX_AUTOPILOT:-}" == "1" && -n "${ZELLIJ_SESSION:-}" ]]; then scripts/autopilot.sh "$issue" >/dev/null 2>&1 & disown || true; fi
-      write_status running "$cycle_ts" "$issue_snapshot" "$issue" "/start" ok "$act_ts"
+      write_status running "$cycle_ts" "$pending_snapshot" "$issue" "/start" ok "$act_ts"
     else
-      rc=$?; emit error "issue=$issue action=/start exit=$rc"; log "Failed to dispatch /start to #$issue (exit=$rc)"; write_status running "$cycle_ts" "$issue_snapshot" "$issue" "/start" "error:$rc" "$act_ts"
+      rc=$?; emit error "issue=$issue action=/start exit=$rc"; log "Failed to dispatch /start to #$issue (exit=$rc)"; write_status running "$cycle_ts" "$pending_snapshot" "$issue" "/start" "error:$rc" "$act_ts"
     fi
   done
   sleep "$WATCH_INTERVAL"

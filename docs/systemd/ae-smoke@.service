@@ -1,0 +1,13 @@
+[Unit]
+Description=AE Smoke Runner for %i
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/work/CodeX/ae-orch-work/ae-orchestrator
+Environment=GH_REPO=itdojp/ae-orchestrator
+Environment=AGENT_ROLE=%i
+ExecStart=/usr/bin/bash scripts/smoke/run-cron-wrapper.sh
+
+[Install]
+WantedBy=default.target

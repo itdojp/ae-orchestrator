@@ -1,0 +1,5 @@
+telemetry/events.ndjson
+telemetry/logs/
+telemetry/status/
+telemetry/report-*.html
+telemetry/report-*.txt

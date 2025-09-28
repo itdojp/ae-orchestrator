@@ -24,5 +24,6 @@ Instructions (Marathon):
 PROMPT
 )
 (
-  cd "$AGENT_WORKDIR"; codex "$prompt"
+  cd "$AGENT_WORKDIR"
+  codex exec "$prompt"
 )

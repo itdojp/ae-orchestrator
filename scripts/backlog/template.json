@@ -1,0 +1,22 @@
+{
+  "epic": "AE-EPIC-1",
+  "sprint": "sprint0",
+  "tasks": [
+    {
+      "id": "task-001",
+      "title": "Implement feature stub",
+      "body": "Describe the task in detail. Include acceptance criteria and links to related context.",
+      "role": "role:IMPL-MED-1",
+      "labels": ["priority:P2"],
+      "ready": true
+    },
+    {
+      "id": "task-002",
+      "title": "Write documentation",
+      "body": "Document usage and add examples.",
+      "role": "role:IMPL-MED-1",
+      "labels": ["area:docs"],
+      "ready": false
+    }
+  ]
+}
